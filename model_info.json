@@ -1,0 +1,41 @@
+{
+  "model_name": "Random Forest",
+  "needs_scaling": false,
+  "num_cols": [
+    "tenure",
+    "MonthlyCharges",
+    "TotalCharges",
+    "AvgMonthlySpend"
+  ],
+  "n_features": 31,
+  "metrics": {
+    "Accuracy": 0.759,
+    "Precision": 0.532,
+    "Recall": 0.775,
+    "F1-Score": 0.631,
+    "ROC-AUC": 0.844
+  },
+  "all_results": {
+    "Logistic Regression": {
+      "Accuracy": 0.742,
+      "Precision": 0.51,
+      "Recall": 0.786,
+      "F1-Score": 0.618,
+      "ROC-AUC": 0.847
+    },
+    "Decision Tree": {
+      "Accuracy": 0.724,
+      "Precision": 0.488,
+      "Recall": 0.81,
+      "F1-Score": 0.609,
+      "ROC-AUC": 0.828
+    },
+    "Random Forest": {
+      "Accuracy": 0.759,
+      "Precision": 0.532,
+      "Recall": 0.775,
+      "F1-Score": 0.631,
+      "ROC-AUC": 0.844
+    }
+  }
+}

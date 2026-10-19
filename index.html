@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Customer Churn Predictor</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+{% macro select(name, label, help=None) -%}
+  <div class="field">
+    <label for="{{ name }}">{{ label }}</label>
+    <select id="{{ name }}" name="{{ name }}" required>
+      <option value="" disabled {% if not form.get(name) %}selected{% endif %}>Select…</option>
+      {% for opt in options[name] %}
+        <option value="{{ opt }}" {% if form.get(name) == opt %}selected{% endif %}>
+          {%- if name == 'SeniorCitizen' -%}{{ 'Yes' if opt == '1' else 'No' }}{%- else -%}{{ opt }}{%- endif -%}
+        </option>
+      {% endfor %}
+    </select>
+    {% if help %}<small>{{ help }}</small>{% endif %}
+  </div>
+{%- endmacro %}
+
+<header class="top">
+  <div class="wrap">
+    <h1>Customer Churn Predictor</h1>
+    <p>Enter a telecom customer's details to predict whether they are likely to leave.
+       Powered by the <strong>{{ model_name }}</strong> model from Assignment 1
+       (test F1-score {{ metrics['F1-Score'] }}, recall {{ metrics['Recall'] }}).</p>
+  </div>
+</header>
+
+<main class="wrap">
+
+  {% if errors %}
+  <div class="alert" role="alert">
+    <strong>Please fix the following:</strong>
+    <ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+
+  {% if result %}
+  <section class="result {{ 'churn' if result.is_churn else 'stay' }}" id="result">
+    <div class="verdict">
+      <span class="tag">Prediction</span>
+      <h2>{{ result.label }}</h2>
+      <p>
+        {% if result.is_churn %}
+          This customer is <strong>likely to leave</strong>. Consider a retention offer.
+        {% else %}
+          This customer is <strong>likely to stay</strong>.
+        {% endif %}
+      </p>
+    </div>
+    <div class="prob">
+      <div class="prob-head">
+        <span>Churn probability</span>
+        <strong>{{ result.probability }}%</strong>
+      </div>
+      <div class="bar"><div class="fill" style="width: {{ result.probability }}%"></div></div>
+      <p class="risk">Risk level: <strong>{{ result.risk }}</strong></p>
+    </div>
+    <div class="factors">
+      {% if result.risk_factors %}
+      <div>
+        <h3>Raises risk</h3>
+        <ul>{% for r in result.risk_factors %}<li>{{ r }}</li>{% endfor %}</ul>
+      </div>
+      {% endif %}
+      {% if result.protective_factors %}
+      <div>
+        <h3>Lowers risk</h3>
+        <ul>{% for r in result.protective_factors %}<li>{{ r }}</li>{% endfor %}</ul>
+      </div>
+      {% endif %}
+    </div>
+    <p class="note">Factors are general patterns from the Assignment 1 data analysis; the prediction itself comes from the trained model.</p>
+  </section>
+  {% endif %}
+
+  <form method="POST" action="{{ url_for('predict') }}" novalidate id="churn-form">
+    <div class="examples">
+      <span>Quick test:</span>
+      <button type="button" class="ghost" data-example="high">Fill high-risk example</button>
+      <button type="button" class="ghost" data-example="low">Fill low-risk example</button>
+      <button type="button" class="ghost" id="clear-btn">Clear</button>
+    </div>
+
+    <fieldset>
+      <legend>Customer profile</legend>
+      <div class="grid">
+        {{ select('gender', 'Gender') }}
+        {{ select('SeniorCitizen', 'Senior citizen') }}
+        {{ select('Partner', 'Has a partner') }}
+        {{ select('Dependents', 'Has dependents') }}
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Account &amp; billing</legend>
+      <div class="grid">
+        <div class="field">
+          <label for="tenure">Tenure (months)</label>
+          <input type="number" id="tenure" name="tenure" min="0" max="100" step="1"
+                 placeholder="e.g. 12" value="{{ form.get('tenure', '') }}" required>
+          <small>Months the customer has been with the company (0–72 in the data).</small>
+        </div>
+        <div class="field">
+          <label for="MonthlyCharges">Monthly charges ($)</label>
+          <input type="number" id="MonthlyCharges" name="MonthlyCharges" min="0" max="500" step="0.01"
+                 placeholder="e.g. 70.35" value="{{ form.get('MonthlyCharges', '') }}" required>
+        </div>
+        <div class="field">
+          <label for="TotalCharges">Total charges ($)</label>
+          <input type="number" id="TotalCharges" name="TotalCharges" min="0" max="50000" step="0.01"
+                 placeholder="e.g. 844.20" value="{{ form.get('TotalCharges', '') }}" required>
+          <small><a href="#" id="estimate-total">Estimate from tenure × monthly</a></small>
+        </div>
+        {{ select('Contract', 'Contract type') }}
+        {{ select('PaperlessBilling', 'Paperless billing') }}
+        {{ select('PaymentMethod', 'Payment method') }}
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Phone services</legend>
+      <div class="grid">
+        {{ select('PhoneService', 'Phone service') }}
+        {{ select('MultipleLines', 'Multiple lines') }}
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Internet services</legend>
+      <div class="grid">
+        {{ select('InternetService', 'Internet service') }}
+        {{ select('OnlineSecurity', 'Online security') }}
+        {{ select('OnlineBackup', 'Online backup') }}
+        {{ select('DeviceProtection', 'Device protection') }}
+        {{ select('TechSupport', 'Tech support') }}
+        {{ select('StreamingTV', 'Streaming TV') }}
+        {{ select('StreamingMovies', 'Streaming movies') }}
+      </div>
+    </fieldset>
+
+    <button type="submit" class="primary">Predict churn</button>
+  </form>
+</main>
+
+<footer class="wrap foot">
+  AI Assignment 2 · Customer Churn Prediction with Flask · M. Faizan (70175858)
+</footer>
+
+<script>
+  // Keep dependent dropdowns consistent (the server validates this too).
+  const addons = ["OnlineSecurity","OnlineBackup","DeviceProtection","TechSupport","StreamingTV","StreamingMovies"];
+  const $ = id => document.getElementById(id);
+
+  function syncPhone() {
+    const ml = $("MultipleLines");
+    if ($("PhoneService").value === "No") { ml.value = "No phone service"; ml.classList.add("locked"); }
+    else {
+      ml.classList.remove("locked");
+      if (ml.value === "No phone service") ml.value = "";
+    }
+  }
+  function syncInternet() {
+    const none = $("InternetService").value === "No";
+    addons.forEach(id => {
+      const el = $(id);
+      if (none) { el.value = "No internet service"; el.classList.add("locked"); }
+      else {
+        el.classList.remove("locked");
+        if (el.value === "No internet service") el.value = "";
+      }
+    });
+  }
+  $("PhoneService").addEventListener("change", syncPhone);
+  $("InternetService").addEventListener("change", syncInternet);
+  if ($("PhoneService").value === "No") syncPhone();
+  if ($("InternetService").value === "No") syncInternet();
+
+  $("estimate-total").addEventListener("click", e => {
+    e.preventDefault();
+    const t = parseFloat($("tenure").value), m = parseFloat($("MonthlyCharges").value);
+    if (!isNaN(t) && !isNaN(m)) $("TotalCharges").value = (t === 0 ? 0 : t * m).toFixed(2);
+  });
+
+  // Same two customers used in Assignment 1, section 7
+  const examples = {
+    high: {gender:"Female", SeniorCitizen:"0", Partner:"No", Dependents:"No", tenure:2,
+           PhoneService:"Yes", MultipleLines:"No", InternetService:"Fiber optic",
+           OnlineSecurity:"No", OnlineBackup:"No", DeviceProtection:"No", TechSupport:"No",
+           StreamingTV:"No", StreamingMovies:"No", Contract:"Month-to-month",
+           PaperlessBilling:"Yes", PaymentMethod:"Electronic check",
+           MonthlyCharges:80.0, TotalCharges:160.0},
+    low:  {gender:"Male", SeniorCitizen:"0", Partner:"Yes", Dependents:"Yes", tenure:60,
+           PhoneService:"Yes", MultipleLines:"Yes", InternetService:"DSL",
+           OnlineSecurity:"Yes", OnlineBackup:"Yes", DeviceProtection:"Yes", TechSupport:"Yes",
+           StreamingTV:"No", StreamingMovies:"No", Contract:"Two year",
+           PaperlessBilling:"No", PaymentMethod:"Bank transfer (automatic)",
+           MonthlyCharges:65.0, TotalCharges:3900.0}
+  };
+  document.querySelectorAll("[data-example]").forEach(btn => btn.addEventListener("click", () => {
+    const ex = examples[btn.dataset.example];
+    Object.entries(ex).forEach(([k, v]) => { $(k).value = v; });
+    syncPhone(); syncInternet();
+    Object.entries(ex).forEach(([k, v]) => { $(k).value = v; });
+  }));
+  $("clear-btn").addEventListener("click", () => {
+    document.querySelectorAll("#churn-form select, #churn-form input").forEach(el => {
+      el.value = ""; el.classList.remove("locked");
+    });
+  });
+
+  // Scroll to the result after a prediction
+  const res = document.getElementById("result");
+  if (res) res.scrollIntoView({behavior: "smooth", block: "start"});
+</script>
+</body>
+</html>
